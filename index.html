@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>StudyGrove | God Mode v3.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'], mono: ['"JetBrains Mono"', 'monospace'] },
+                    animation: { 'float': 'float 6s ease-in-out infinite', 'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite' },
+                    keyframes: { float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-10px)' } } }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root { --glass-border: rgba(255, 255, 255, 0.08); --glass-bg: rgba(15, 23, 42, 0.6); }
+        body { overflow: hidden; background: #000; transition: all 0.5s ease; }
+        
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.4); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+        .glass-dock {
+            background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px;
+        }
+        .glass-input {
+            background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: white;
+            transition: all 0.3s ease;
+        }
+        .glass-input:focus { background: rgba(255, 255, 255, 0.1); border-color: rgba(16, 185, 129, 0.5); outline: none; }
+        
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        
+        #bg-layer { transition: background-image 1s ease-in-out; }
+        .matrix-mode { font-family: 'JetBrains Mono', monospace; color: #0f0 !important; }
+        .matrix-mode .glass-panel { background: rgba(0, 20, 0, 0.9); border: 1px solid #0f0; box-shadow: 0 0 15px #0f0; }
+        
+        /* Spotify Minimized State */
+        .spotify-minimized {
+            width: 50px !important; height: 50px !important; border-radius: 50% !important;
+            overflow: hidden !important; padding: 0 !important; cursor: pointer;
+            animation: pulse-slow 2s infinite;
+        }
+        .spotify-minimized * { display: none !important; }
+        .spotify-minimized::after {
+            content: '\f1bc'; font-family: "Font Awesome 6 Brands"; 
+            position: absolute; inset: 0; display: flex !important;
+            align-items: center; justify-content: center; 
+            color: #1DB954; font-size: 24px; background: rgba(0,0,0,0.8);
+        }
+    </style>
+</head>
+<body class="text-white h-screen w-screen relative selection:bg-emerald-500 selection:text-black">
+
+    <div id="bg-layer" class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700 transform scale-105" style="background-image: url('https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?q=80&w=2070&auto=format&fit=crop');">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
+    </div>
+
+    <div id="live-clock-widget" class="fixed top-6 right-6 z-30 font-mono text-right opacity-80 hover:opacity-100 transition pointer-events-none">
+        <div id="live-time" class="text-3xl font-bold">--:--</div>
+        <div id="live-date" class="text-sm text-slate-300">Loading...</div>
+    </div>
+
+    <div id="spotify-widget" class="fixed top-6 left-6 z-40 w-80 glass-panel rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-[0_0_30px_rgba(29,185,84,0.3)] group flex flex-col max-h-[500px]" onclick="checkMaximize()">
+        <div class="h-8 bg-black/20 cursor-move flex items-center justify-between px-3 shrink-0" id="spotify-drag">
+            <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold"><i class="fa-brands fa-spotify text-green-500 mr-1"></i> Music</span>
+            <div class="flex gap-2">
+                 <button onclick="togglePlaylistView(event)" class="text-slate-400 hover:text-white" title="Playlists"><i class="fa-solid fa-list"></i></button>
+                 <button onclick="toggleSpotifyMinimize(event)" class="text-slate-400 hover:text-white"><i class="fa-solid fa-minus"></i></button>
+            </div>
+        </div>
+        
+        <div id="spotify-player" class="p-0 transition-all duration-300">
+            <iframe id="spotify-frame" style="border-radius:0" src="https://open.spotify.com/embed/playlist/0vvXsWCC9xrXsKd4FyS8kM?utm_source=generator&theme=0" width="100%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+        </div>
+
+        <div id="spotify-library" class="p-3 hidden overflow-y-auto custom-scroll flex-1 bg-black/40">
+            <p class="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Select Vibe</p>
+            <div class="grid grid-cols-3 gap-2">
+                <button onclick="changePlaylist('lofi')" class="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-white/10 transition">
+                    <div class="w-10 h-10 rounded bg-indigo-500/20 flex items-center justify-center text-indigo-400"><i class="fa-solid fa-headphones"></i></div>
+                    <span class="text-[10px]">Lofi</span>
+                </button>
+                <button onclick="changePlaylist('piano')" class="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-white/10 transition">
+                    <div class="w-10 h-10 rounded bg-pink-500/20 flex items-center justify-center text-pink-400"><i class="fa-solid fa-music"></i></div>
+                    <span class="text-[10px]">Piano</span>
+                </button>
+                <button onclick="changePlaylist('rain')" class="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-white/10 transition">
+                    <div class="w-10 h-10 rounded bg-blue-500/20 flex items-center justify-center text-blue-400"><i class="fa-solid fa-cloud-rain"></i></div>
+                    <span class="text-[10px]">Rain</span>
+                </button>
+                 <button onclick="changePlaylist('cafe')" class="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-white/10 transition">
+                    <div class="w-10 h-10 rounded bg-orange-500/20 flex items-center justify-center text-orange-400"><i class="fa-solid fa-mug-hot"></i></div>
+                    <span class="text-[10px]">Cafe</span>
+                </button>
+                 <button onclick="changePlaylist('nature')" class="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-white/10 transition">
+                    <div class="w-10 h-10 rounded bg-green-500/20 flex items-center justify-center text-green-400"><i class="fa-solid fa-tree"></i></div>
+                    <span class="text-[10px]">Nature</span>
+                </button>
+                 <button onclick="changePlaylist('synth')" class="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-white/10 transition">
+                    <div class="w-10 h-10 rounded bg-purple-500/20 flex items-center justify-center text-purple-400"><i class="fa-solid fa-gamepad"></i></div>
+                    <span class="text-[10px]">Synth</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main id="main-ui" class="relative z-10 w-full h-full flex flex-col items-center justify-center p-4 pt-10 pb-28 transition-all duration-500">
+        
+        <div id="view-home" class="view-section w-full max-w-4xl h-full flex flex-col items-center justify-center relative">
+            <div class="text-center animate-float">
+                <p id="quote-display" class="text-xl md:text-2xl font-light text-slate-200 drop-shadow-lg mb-4 italic px-4 min-h-[3rem] flex items-center justify-center">"Focus is the key to all success."</p>
+                
+                <div class="relative group cursor-pointer" onclick="toggleTimer()">
+                    <div class="absolute -inset-8 bg-emerald-500/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition duration-700"></div>
+                    <h1 id="timer-display" class="text-[140px] md:text-[200px] font-bold leading-none tracking-tighter drop-shadow-2xl font-mono select-none">25:00</h1>
+                    <p id="timer-status" class="text-emerald-400 text-lg uppercase tracking-[0.5em] mt-2 font-bold opacity-80">Ready to Focus</p>
+                </div>
+
+                <div class="mt-12 glass-panel px-6 py-3 rounded-full flex items-center gap-3 w-auto mx-auto hover:bg-white/10 transition group">
+                    <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <input type="text" id="current-task" placeholder="What are you working on?" class="bg-transparent border-none outline-none text-center text-lg w-64 md:w-96 placeholder-slate-400 group-hover:w-[400px] transition-all">
+                    <i class="fa-solid fa-pen text-slate-500 text-sm"></i>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-dashboard" class="view-section hidden w-full max-w-6xl h-full">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 h-full pb-6">
+                <div class="glass-panel rounded-3xl p-6 flex flex-col gap-6">
+                    <h2 class="text-2xl font-bold flex items-center gap-2"><i class="fa-solid fa-chart-pie text-emerald-400"></i> Analytics</h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-white/5 p-4 rounded-xl text-center">
+                            <p class="text-xs text-slate-400">Focus Time</p>
+                            <p id="stat-total-time" class="text-2xl font-bold font-mono">0h 0m</p>
+                        </div>
+                        <div class="bg-white/5 p-4 rounded-xl text-center">
+                            <p class="text-xs text-slate-400">Trees Grown</p>
+                            <p id="stat-trees" class="text-2xl font-bold text-green-400">0</p>
+                        </div>
+                    </div>
+                    <div class="flex-1 bg-white/5 rounded-xl p-4 flex items-center justify-center">
+                        <canvas id="weeklyChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="md:col-span-2 glass-panel rounded-3xl p-6 flex flex-col">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-4"><i class="fa-solid fa-tree text-green-500"></i> My Forest</h2>
+                    <div id="forest-container" class="flex-1 bg-gradient-to-b from-blue-900/20 to-green-900/20 rounded-2xl p-6 overflow-y-auto custom-scroll grid grid-cols-6 md:grid-cols-8 gap-4 content-start">
+                        <p class="col-span-full text-center text-slate-500 mt-20">Start a session to plant your first tree!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-youtube" class="view-section hidden w-full max-w-[95%] h-full">
+            <div class="glass-panel w-full h-full rounded-3xl flex flex-col overflow-hidden relative">
+                <div class="h-14 border-b border-white/10 flex items-center px-4 gap-4 bg-black/40 justify-between">
+                    <div class="flex items-center gap-4 flex-1">
+                        <i class="fa-brands fa-youtube text-red-500 text-xl"></i>
+                        <input type="text" id="yt-url-input" placeholder="Paste YouTube URL..." class="glass-input px-3 py-1.5 rounded-lg text-sm w-full max-w-md">
+                        <button onclick="loadYouTube()" class="bg-red-600 hover:bg-red-700 px-4 py-1.5 rounded-lg text-sm font-bold transition">Load</button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs font-mono text-emerald-400">
+                            Watch Time: <span id="yt-watch-timer">00:00</span>
+                        </div>
+                        <button onclick="toggleSplitScreen()" class="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm border border-white/10 transition" title="Toggle Split Screen">
+                            <i class="fa-solid fa-table-columns"></i> <span class="hidden md:inline">Split Screen</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 flex overflow-hidden">
+                    <div id="yt-video-container" class="flex-1 bg-black relative transition-all duration-500">
+                        <div id="yt-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600">
+                            <i class="fa-brands fa-youtube text-6xl mb-4 opacity-50"></i>
+                            <p>Load a video to start learning</p>
+                        </div>
+                        <iframe id="yt-iframe" class="w-full h-full hidden" src="" frameborder="0" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe>
+                    </div>
+
+                    <div id="yt-tools-panel" class="w-0 border-l border-white/10 bg-slate-900/80 backdrop-blur-md flex flex-col transition-all duration-500 overflow-hidden">
+                        <div class="flex border-b border-white/10">
+                            <button onclick="switchTool('pdf')" class="flex-1 py-3 text-sm hover:bg-white/5 border-b-2 border-transparent hover:border-emerald-400 transition text-slate-300">PDF</button>
+                            <button onclick="switchTool('notes')" class="flex-1 py-3 text-sm hover:bg-white/5 border-b-2 border-transparent hover:border-emerald-400 transition text-slate-300">Notes</button>
+                            <button onclick="switchTool('calc')" class="flex-1 py-3 text-sm hover:bg-white/5 border-b-2 border-transparent hover:border-emerald-400 transition text-slate-300">Calc</button>
+                            <button onclick="switchTool('doubts')" class="flex-1 py-3 text-sm hover:bg-white/5 border-b-2 border-transparent hover:border-emerald-400 transition text-slate-300">Doubts</button>
+                        </div>
+
+                        <div class="flex-1 p-4 overflow-y-auto custom-scroll relative">
+                            <div id="tool-pdf" class="tool-content h-full flex flex-col">
+                                <input type="file" id="pdf-upload" accept="application/pdf" class="mb-4 text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-500 file:text-white hover:file:bg-emerald-600"/>
+                                <embed id="pdf-viewer" src="" type="application/pdf" width="100%" height="100%" class="rounded-lg bg-white hidden">
+                                <p id="pdf-msg" class="text-center text-slate-500 mt-10">Upload a PDF to view it here.</p>
+                            </div>
+
+                            <div id="tool-notes" class="tool-content h-full hidden">
+                                <textarea id="quick-notes" class="w-full h-full bg-black/20 border border-white/10 rounded-lg p-4 text-slate-300 focus:outline-none focus:border-emerald-500 resize-none font-mono text-sm" placeholder="Type your lecture notes here..."></textarea>
+                            </div>
+
+                            <div id="tool-calc" class="tool-content h-full hidden flex flex-col items-center">
+                                <div class="bg-black/40 p-4 rounded-2xl border border-white/10 w-full max-w-[280px]">
+                                    <input type="text" id="calc-display" readonly class="w-full bg-black/20 text-right text-2xl font-mono p-3 rounded-lg mb-4 text-emerald-400 border border-white/5">
+                                    <div class="grid grid-cols-4 gap-2">
+                                        <button onclick="calc('C')" class="p-3 bg-red-500/20 text-red-400 rounded hover:bg-red-500/40 font-bold">C</button>
+                                        <button onclick="calc('/')" class="p-3 bg-white/10 rounded hover:bg-white/20 font-bold">/</button>
+                                        <button onclick="calc('*')" class="p-3 bg-white/10 rounded hover:bg-white/20 font-bold">×</button>
+                                        <button onclick="calc('-')" class="p-3 bg-white/10 rounded hover:bg-white/20 font-bold">-</button>
+                                        <button onclick="calc('7')" class="p-3 bg-white/5 rounded hover:bg-white/10">7</button>
+                                        <button onclick="calc('8')" class="p-3 bg-white/5 rounded hover:bg-white/10">8</button>
+                                        <button onclick="calc('9')" class="p-3 bg-white/5 rounded hover:bg-white/10">9</button>
+                                        <button onclick="calc('+')" class="p-3 bg-white/10 rounded hover:bg-white/20 font-bold row-span-2 flex items-center justify-center">+</button>
+                                        <button onclick="calc('4')" class="p-3 bg-white/5 rounded hover:bg-white/10">4</button>
+                                        <button onclick="calc('5')" class="p-3 bg-white/5 rounded hover:bg-white/10">5</button>
+                                        <button onclick="calc('6')" class="p-3 bg-white/5 rounded hover:bg-white/10">6</button>
+                                        <button onclick="calc('1')" class="p-3 bg-white/5 rounded hover:bg-white/10">1</button>
+                                        <button onclick="calc('2')" class="p-3 bg-white/5 rounded hover:bg-white/10">2</button>
+                                        <button onclick="calc('3')" class="p-3 bg-white/5 rounded hover:bg-white/10">3</button>
+                                        <button onclick="calc('=')" class="p-3 bg-emerald-500 text-white rounded hover:bg-emerald-600 font-bold row-span-2 flex items-center justify-center">=</button>
+                                        <button onclick="calc('0')" class="p-3 bg-white/5 rounded hover:bg-white/10 col-span-2">0</button>
+                                        <button onclick="calc('.')" class="p-3 bg-white/5 rounded hover:bg-white/10">.</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                             <div id="tool-doubts" class="tool-content h-full hidden">
+                                 <div class="flex justify-between items-center mb-4">
+                                     <h3 class="font-bold">Quick Doubts</h3>
+                                     <button onclick="openAddDoubtModal()" class="text-xs bg-emerald-500 px-2 py-1 rounded">Add</button>
+                                 </div>
+                                 <div id="mini-doubts-list" class="space-y-2 overflow-y-auto max-h-[400px] custom-scroll"></div>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-doubts" class="view-section hidden w-full max-w-5xl h-full">
+            <div class="glass-panel w-full h-full rounded-3xl p-6 flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold">Doubts & Questions</h2>
+                    <button onclick="openAddDoubtModal()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg transition transform hover:scale-105">+ New Doubt</button>
+                </div>
+                
+                <div class="flex gap-2 mb-6 overflow-x-auto pb-2 custom-scroll">
+                    <button onclick="filterDoubts('all')" class="px-4 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-sm border border-white/5">All</button>
+                    <button onclick="filterDoubts('Pending')" class="px-4 py-1.5 rounded-full bg-red-500/20 text-red-300 text-sm border border-red-500/30">Pending</button>
+                    <button onclick="filterDoubts('Solved')" class="px-4 py-1.5 rounded-full bg-green-500/20 text-green-300 text-sm border border-green-500/30">Solved</button>
+                </div>
+
+                <div id="doubts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto custom-scroll pr-2 pb-10">
+                    </div>
+            </div>
+        </div>
+
+        <div id="view-browser" class="view-section hidden w-full max-w-[95%] h-full">
+            <div class="glass-panel w-full h-full rounded-3xl flex flex-col overflow-hidden">
+                <div class="h-12 bg-black/40 border-b border-white/10 flex items-center px-4 gap-3">
+                    <button onclick="document.getElementById('web-frame').contentWindow.history.back()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-arrow-left"></i></button>
+                    <button onclick="document.getElementById('web-frame').contentWindow.history.forward()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-arrow-right"></i></button>
+                    <button onclick="document.getElementById('web-frame').src = document.getElementById('web-frame').src" class="text-slate-400 hover:text-white"><i class="fa-solid fa-rotate-right"></i></button>
+                    <input type="text" id="browser-url" value="https://www.google.com/webhp?igu=1" class="glass-input flex-1 px-4 py-1.5 rounded-full text-sm text-center" onchange="navigateTo(this.value)">
+                </div>
+                <iframe id="web-frame" src="https://www.google.com/webhp?igu=1" class="flex-1 bg-white" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+            </div>
+        </div>
+        
+        <div id="view-calendar" class="view-section hidden w-full max-w-5xl h-full">
+            <div class="glass-panel w-full h-full rounded-3xl p-8 flex flex-col">
+                <div class="flex justify-between items-center mb-8 shrink-0">
+                    <h2 class="text-3xl font-bold">Study History</h2>
+                    <div class="flex gap-4">
+                        <button onclick="changeMonth(-1)" class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20"><i class="fa-solid fa-chevron-left"></i></button>
+                        <h3 id="calendar-month-year" class="text-xl font-bold w-48 text-center">Month Year</h3>
+                        <button onclick="changeMonth(1)" class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-7 gap-2 text-center text-slate-400 mb-2 font-bold uppercase text-xs tracking-wider shrink-0">
+                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                </div>
+                <div class="flex-1 overflow-hidden relative">
+                    <div id="calendar-grid" class="grid grid-cols-7 gap-2 auto-rows-fr h-full overflow-y-auto custom-scroll pr-2 absolute inset-0">
+                        </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <nav id="bottom-dock" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 w-auto transition-transform duration-500">
+        <div class="glass-dock px-3 py-2 flex items-center gap-1 md:gap-2 shadow-2xl transition-all duration-300 hover:scale-105">
+            <button onclick="switchView('home')" class="dock-item p-3 rounded-2xl hover:bg-white/10 transition group relative" data-tooltip="Focus">
+                <i class="fa-solid fa-clock text-2xl text-white group-hover:-translate-y-2 transition-transform duration-300"></i>
+            </button>
+            <button onclick="switchView('dashboard')" class="dock-item p-3 rounded-2xl hover:bg-white/10 transition group relative" data-tooltip="Dashboard">
+                <i class="fa-solid fa-chart-simple text-2xl text-white group-hover:-translate-y-2 transition-transform duration-300"></i>
+            </button>
+            <button onclick="switchView('youtube')" class="dock-item p-3 rounded-2xl hover:bg-white/10 transition group relative" data-tooltip="Learn">
+                <i class="fa-brands fa-youtube text-2xl text-white group-hover:-translate-y-2 transition-transform duration-300"></i>
+            </button>
+            <button onclick="switchView('doubts')" class="dock-item p-3 rounded-2xl hover:bg-white/10 transition group relative" data-tooltip="Doubts">
+                <i class="fa-solid fa-circle-question text-2xl text-white group-hover:-translate-y-2 transition-transform duration-300"></i>
+            </button>
+            <button onclick="switchView('calendar')" class="dock-item p-3 rounded-2xl hover:bg-white/10 transition group relative" data-tooltip="Calendar">
+                <i class="fa-solid fa-calendar-days text-2xl text-white group-hover:-translate-y-2 transition-transform duration-300"></i>
+            </button>
+            <div class="w-px h-8 bg-white/20 mx-1"></div>
+            <button onclick="switchView('browser')" class="dock-item p-3 rounded-2xl hover:bg-white/10 transition group relative" data-tooltip="Browser">
+                <i class="fa-solid fa-globe text-2xl text-blue-300 group-hover:-translate-y-2 transition-transform duration-300"></i>
+            </button>
+            <button onclick="toggleSettings()" class="dock-item p-3 rounded-2xl hover:bg-white/10 transition group relative" data-tooltip="Settings">
+                <i class="fa-solid fa-gear text-2xl text-slate-400 group-hover:-translate-y-2 transition-transform duration-300"></i>
+            </button>
+             <button onclick="toggleAmbientMode()" class="dock-item p-3 rounded-2xl hover:bg-white/10 transition group relative text-yellow-300" title="Hide UI (Ambient Mode)">
+                <i class="fa-solid fa-eye-slash text-2xl group-hover:-translate-y-2 transition-transform duration-300"></i>
+            </button>
+             <button onclick="toggleFullscreen()" class="dock-item p-3 rounded-2xl hover:bg-white/10 transition group relative text-purple-300" title="Fullscreen">
+                <i class="fa-solid fa-expand text-2xl group-hover:-translate-y-2 transition-transform duration-300"></i>
+            </button>
+        </div>
+    </nav>
+
+    <button id="restore-ui-btn" onclick="toggleAmbientMode()" class="fixed bottom-6 right-6 z-50 p-4 bg-white/10 backdrop-blur-lg rounded-full text-white shadow-xl hover:bg-white/20 transition opacity-0 pointer-events-none transform translate-y-10">
+        <i class="fa-solid fa-eye text-xl"></i>
+    </button>
+
+    <div id="modal-doubt" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-lg rounded-2xl p-6 transform scale-100 transition-all">
+            <h3 class="text-xl font-bold mb-4">New Doubt</h3>
+            <input type="text" id="doubt-subject" placeholder="Subject (e.g. Physics)" class="glass-input w-full p-3 rounded-xl mb-3">
+            <textarea id="doubt-text" placeholder="Describe your doubt..." class="glass-input w-full p-3 rounded-xl mb-3 h-32 resize-none"></textarea>
+            <div class="flex gap-3 mb-4">
+                <select id="doubt-priority" class="glass-input flex-1 p-3 rounded-xl bg-black">
+                    <option value="Low">Low Priority</option>
+                    <option value="Medium" selected>Medium Priority</option>
+                    <option value="High">High Priority</option>
+                </select>
+                <div class="relative flex-1">
+                    <input type="file" id="doubt-image" class="hidden" accept="image/*" onchange="previewImage(this)">
+                    <label for="doubt-image" class="glass-input w-full p-3 rounded-xl block text-center cursor-pointer hover:bg-white/10 truncate">
+                        <i class="fa-solid fa-image"></i> Upload Image
+                    </label>
+                </div>
+            </div>
+            <div id="image-preview" class="mb-4 hidden">
+                <img src="" class="h-20 rounded-lg object-cover border border-white/20">
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal('modal-doubt')" class="px-4 py-2 rounded-lg hover:bg-white/10">Cancel</button>
+                <button onclick="saveDoubt()" class="px-6 py-2 bg-emerald-500 rounded-lg font-bold hover:bg-emerald-600">Save Doubt</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-cal-details" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md rounded-2xl p-6">
+            <h3 id="cal-date-title" class="text-xl font-bold mb-4 border-b border-white/10 pb-2">Date Details</h3>
+            <div id="cal-content" class="space-y-4 max-h-[60vh] overflow-y-auto custom-scroll">
+                </div>
+            <button onclick="closeModal('modal-cal-details')" class="mt-4 w-full py-2 bg-white/10 rounded-lg hover:bg-white/20">Close</button>
+        </div>
+    </div>
+
+    <div id="modal-settings" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-3xl rounded-2xl p-8 max-h-[90vh] overflow-y-auto custom-scroll">
+            <h2 class="text-2xl font-bold mb-6">Settings & Themes</h2>
+            
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-3">Ambient Themes (30+)</label>
+                    <div id="theme-grid" class="grid grid-cols-3 md:grid-cols-5 gap-3">
+                        </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm text-slate-400 mb-2">Focus Duration (mins)</label>
+                    <input type="range" id="setting-focus" min="5" max="90" value="25" class="w-full accent-emerald-500" oninput="updateTimerSettings()">
+                    <div class="text-right font-mono text-emerald-400" id="setting-focus-val">25</div>
+                </div>
+
+                <div class="pt-4 border-t border-white/10">
+                    <button onclick="clearData()" class="text-red-400 text-sm hover:underline">Clear All Data (Factory Reset)</button>
+                </div>
+            </div>
+            
+            <button onclick="closeModal('modal-settings')" class="mt-8 w-full py-3 bg-emerald-500 rounded-xl font-bold hover:bg-emerald-600">Save & Close</button>
+        </div>
+    </div>
+
+    <script>
+        // === 20 MOTIVATIONAL QUOTES ===
+        const QUOTES = [
+            "Focus is the key to all success.",
+            "The future depends on what you do today.",
+            "Don't watch the clock; do what it does. Keep going.",
+            "Success is the sum of small efforts, repeated.",
+            "Believe you can and you're halfway there.",
+            "Your limitation—it's only your imagination.",
+            "Push yourself, because no one else is going to do it for you.",
+            "Great things never come from comfort zones.",
+            "Dream it. Wish it. Do it.",
+            "Success doesn't just find you. You have to go out and get it.",
+            "The harder you work for something, the greater you'll feel when you achieve it.",
+            "Dream bigger. Do bigger.",
+            "Don't stop when you're tired. Stop when you're done.",
+            "Wake up with determination. Go to bed with satisfaction.",
+            "Do something today that your future self will thank you for.",
+            "Little things make big days.",
+            "It’s going to be hard, but hard does not mean impossible.",
+            "Don't wait for opportunity. Create it.",
+            "Sometimes we’re tested not to show our weaknesses, but to discover our strengths.",
+            "The key to success is to focus on goals, not obstacles."
+        ];
+
+        // === 30 AMBIENT THEMES ===
+        const THEMES = [
+            "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8", // Mountains
+            "https://images.unsplash.com/photo-1441974231531-c6227db76b6e", // Forest
+            "https://images.unsplash.com/photo-1472214103451-9374bd1c798e", // Meadow
+            "https://images.unsplash.com/photo-1507525428034-b723cf961d3e", // Beach
+            "https://images.unsplash.com/photo-1519681393798-38e43269d877", // Night Sky
+            "https://images.unsplash.com/photo-1469474968028-56623f02e42e", // Alone Nature
+            "https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f", // Rain Window
+            "https://images.unsplash.com/photo-1493857671505-72967e2e2760", // Coffee
+            "https://images.unsplash.com/photo-1598928506311-c55ded91a20c", // Cozy Room
+            "https://images.unsplash.com/photo-1554118811-1e0d58224f24", // Cafe
+            "https://images.unsplash.com/photo-1516483638261-f4dbaf036963", // Cinque Terre
+            "https://images.unsplash.com/photo-1534447677768-be436bb09401", // Purple Abstract
+            "https://images.unsplash.com/photo-1550751827-4bd374c3f58b", // Cyberpunk
+            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe", // Liquid Oil
+            "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e", // Dark Gradient
+            "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85", // Gold Minimal
+            "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b", // Mountains Green
+            "https://images.unsplash.com/photo-1506744038136-46273834b3fb", // Yosemite
+            "https://images.unsplash.com/photo-1532274402911-5a369e4c4bb5", // Grass
+            "https://images.unsplash.com/photo-1502082553048-f009c37129b9", // Tree
+            "https://images.unsplash.com/photo-1451187580459-43490279c0fa", // Space
+            "https://images.unsplash.com/photo-1518066000714-58c45f1a2c0a", // Library
+            "https://images.unsplash.com/photo-1483729558449-99ef09a8c325", // Winter
+            "https://images.unsplash.com/photo-1506765515384-028b60a970df", // Fall
+            "https://images.unsplash.com/photo-1501696461415-6bd6660c6742", // Clouds
+            "https://images.unsplash.com/photo-1470770841072-f978cf4d019e", // Orange Sky
+            "https://images.unsplash.com/photo-1505765050516-f72dcac9c60e", // Technology
+            "https://images.unsplash.com/photo-1511447333015-45b65e60f6d5", // Purple Sky
+            "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07", // Deep Forest
+            "https://images.unsplash.com/photo-1475924156734-496f6cac6ec1" // Morning Sun
+        ];
+
+        // === FIXED SPOTIFY PLAYLISTS ===
+        const PLAYLISTS = {
+            lofi: "https://open.spotify.com/embed/playlist/0vvXsWCC9xrXsKd4FyS8kM",
+            piano: "https://open.spotify.com/embed/playlist/37i9dQZF1DX4sWSpwq3LiO",
+            rain: "https://open.spotify.com/embed/playlist/37i9dQZF1DXbvABJXBIyiY",
+            cafe: "https://open.spotify.com/embed/playlist/37i9dQZF1DX6VdMW310YC7",
+            nature: "https://open.spotify.com/embed/playlist/37i9dQZF1DX4PP3DA4J0N8",
+            synth: "https://open.spotify.com/embed/playlist/37i9dQZF1DXdLEN7aqioXM"
+        };
+
+        // === CORE STATE & DATABASE ===
+        const DB_KEY = 'studygrove_god_data_v3';
+        let state = {
+            view: 'home',
+            timer: { time: 25 * 60, total: 25 * 60, isRunning: false, mode: 'focus', interval: null },
+            stats: { totalFocusTime: 0, trees: 0, sessions: [] },
+            doubts: [],
+            forest: [],
+            notes: '',
+            wallpaper: THEMES[0],
+            youtube: { url: '', split: false, watchTime: 0 },
+            task: '',
+            isAmbient: false,
+            spotifyPos: { top: '24px', left: '24px' } // Added position saving
+        };
+
+        // === INITIALIZATION ===
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            renderView();
+            initCalendar();
+            initThemesGrid();
+            initDraggable('spotify-widget', 'spotify-drag');
+            startLiveClock();
+            setRandomQuote();
+            setInterval(saveData, 30000); 
+            
+            // Konami Code
+            let kCode = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+            let kIdx = 0;
+            document.addEventListener('keydown', (e) => {
+                if (e.key === kCode[kIdx]) {
+                    kIdx++;
+                    if (kIdx === kCode.length) { activateMatrixMode(); kIdx = 0; }
+                } else { kIdx = 0; }
+            });
+        });
+
+        // === LIVE CLOCK ===
+        function startLiveClock() {
+            const update = () => {
+                const now = new Date();
+                document.getElementById('live-time').innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('live-date').innerText = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            };
+            update();
+            setInterval(update, 1000); 
+        }
+
+        function setRandomQuote() {
+            const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+            const el = document.getElementById('quote-display');
+            if(el) el.innerText = `"${q}"`;
+        }
+
+        // === SPOTIFY LOGIC ===
+        function changePlaylist(type) {
+            const url = PLAYLISTS[type];
+            if(url) {
+                document.getElementById('spotify-frame').src = url;
+                document.getElementById('spotify-library').classList.add('hidden');
+                document.getElementById('spotify-player').classList.remove('hidden');
+            }
+        }
+        
+        function togglePlaylistView(e) {
+            e.stopPropagation();
+            const lib = document.getElementById('spotify-library');
+            const player = document.getElementById('spotify-player');
+            if (lib.classList.contains('hidden')) {
+                lib.classList.remove('hidden');
+                player.classList.add('hidden');
+            } else {
+                lib.classList.add('hidden');
+                player.classList.remove('hidden');
+            }
+        }
+
+        function toggleSpotifyMinimize(e) {
+            e.stopPropagation();
+            const w = document.getElementById('spotify-widget');
+            w.classList.add('spotify-minimized');
+        }
+
+        function checkMaximize() {
+            const w = document.getElementById('spotify-widget');
+            if(w.classList.contains('spotify-minimized')) {
+                w.classList.remove('spotify-minimized');
+            }
+        }
+
+        // === UI FEATURES ===
+        function toggleAmbientMode() {
+            state.isAmbient = !state.isAmbient;
+            const dock = document.getElementById('bottom-dock');
+            const restoreBtn = document.getElementById('restore-ui-btn');
+            
+            if (state.isAmbient) {
+                if(state.view !== 'home') switchView('home');
+                document.querySelectorAll('.view-section').forEach(el => {
+                    if(el.id !== 'view-home') el.classList.add('opacity-0');
+                });
+                dock.classList.add('translate-y-32', 'opacity-0', 'pointer-events-none');
+                restoreBtn.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-10');
+            } else {
+                document.querySelectorAll('.view-section').forEach(el => el.classList.remove('opacity-0'));
+                dock.classList.remove('translate-y-32', 'opacity-0', 'pointer-events-none');
+                restoreBtn.classList.add('opacity-0', 'pointer-events-none', 'translate-y-10');
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        function renderView() {
+            // Helper to handle initial view state if needed
+            switchView(state.view);
+        }
+
+        // === DRAGGABLE LOGIC (FIXED) ===
+        function initDraggable(elId, handleId) {
+            const el = document.getElementById(elId);
+            const handle = document.getElementById(handleId);
+            let isDragging = false, startX, startY, initLeft, initTop;
+
+            handle.addEventListener('mousedown', (e) => {
+                if(el.classList.contains('spotify-minimized')) return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                initLeft = el.offsetLeft;
+                initTop = el.offsetTop;
+                el.style.transition = 'none'; 
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                el.style.left = `${initLeft + dx}px`;
+                el.style.top = `${initTop + dy}px`;
+            });
+
+            document.addEventListener('mouseup', () => {
+                if(isDragging) {
+                    isDragging = false;
+                    el.style.transition = 'all 0.3s ease';
+                    state.spotifyPos = { top: el.style.top, left: el.style.left }; // Save pos
+                    saveData();
+                }
+            });
+        }
+
+        // === THEME GRID ===
+        function initThemesGrid() {
+            const grid = document.getElementById('theme-grid');
+            if(!grid) return;
+            grid.innerHTML = THEMES.map(url => `
+                <div onclick="setWallpaper('${url}')" class="aspect-video rounded-lg cursor-pointer hover:ring-2 ring-emerald-400 bg-cover bg-center transition-transform hover:scale-105" style="background-image:url('${url}?w=200')"></div>
+            `).join('');
+        }
+
+        // === DATA MANAGEMENT ===
+        function saveData() {
+            state.task = document.getElementById('current-task').value;
+            state.notes = document.getElementById('quick-notes').value;
+            localStorage.setItem(DB_KEY, JSON.stringify(state));
+        }
+
+        function loadData() {
+            const data = localStorage.getItem(DB_KEY);
+            if (data) {
+                const parsed = JSON.parse(data);
+                state = { ...state, ...parsed };
+                // Ensure stats are valid numbers
+                if(!state.stats) state.stats = { totalFocusTime: 0, trees: 0, sessions: [] };
+                
+                document.getElementById('current-task').value = state.task || '';
+                document.getElementById('quick-notes').value = state.notes || '';
+                document.getElementById('bg-layer').style.backgroundImage = `url('${state.wallpaper}')`;
+                
+                // Restore Spotify Position
+                if (state.spotifyPos) {
+                    const el = document.getElementById('spotify-widget');
+                    el.style.top = state.spotifyPos.top;
+                    el.style.left = state.spotifyPos.left;
+                }
+
+                updateTimerDisplay();
+                updateStatsUI();
+                renderForest();
+                renderDoubts();
+            }
+        }
+
+        function clearData() {
+            if(confirm("Are you sure? This will delete all history.")) {
+                localStorage.removeItem(DB_KEY);
+                location.reload();
+            }
+        }
+
+        // === NAVIGATION ===
+        function switchView(viewName) {
+            if(state.isAmbient) toggleAmbientMode(); 
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            
+            const target = document.getElementById(`view-${viewName}`);
+            if(target) target.classList.remove('hidden');
+            
+            state.view = viewName;
+            
+            if (viewName === 'dashboard') updateStatsUI();
+            if (viewName === 'calendar') renderCalendarGrid(new Date().getMonth(), new Date().getFullYear());
+        }
+
+        // === TIMER SYSTEM ===
+        function toggleTimer() {
+            if (state.timer.isRunning) pauseTimer();
+            else startTimer();
+        }
+
+        function startTimer() {
+            state.timer.isRunning = true;
+            document.getElementById('timer-status').innerText = "Focusing...";
+            document.getElementById('timer-status').classList.add('animate-pulse');
+            
+            state.timer.interval = setInterval(() => {
+                if (state.timer.time > 0) {
+                    state.timer.time--;
+                    updateTimerDisplay();
+                } else {
+                    completeSession();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            state.timer.isRunning = false;
+            clearInterval(state.timer.interval);
+            document.getElementById('timer-status').innerText = "Paused";
+            document.getElementById('timer-status').classList.remove('animate-pulse');
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(state.timer.time / 60).toString().padStart(2, '0');
+            const s = (state.timer.time % 60).toString().padStart(2, '0');
+            document.getElementById('timer-display').innerText = `${m}:${s}`;
+            document.title = `${m}:${s} - StudyGrove`;
+        }
+
+        function completeSession() {
+            pauseTimer();
+            const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+            audio.play();
+            alert("Session Complete! Tree Planted 🌱");
+            
+            const session = { date: new Date().toISOString(), duration: state.timer.total };
+            state.stats.sessions.push(session);
+            state.stats.totalFocusTime += state.timer.total;
+            state.stats.trees++;
+            state.forest.push({ date: new Date().toISOString(), type: 'tree' });
+            
+            state.timer.time = state.timer.total;
+            updateTimerDisplay();
+            updateStatsUI();
+            saveData();
+        }
+
+        function updateTimerSettings() {
+            const val = document.getElementById('setting-focus').value;
+            document.getElementById('setting-focus-val').innerText = val;
+            if (!state.timer.isRunning) {
+                state.timer.total = val * 60;
+                state.timer.time = val * 60;
+                updateTimerDisplay();
+            }
+        }
+
+        // === YOUTUBE & SPLIT SCREEN (FIXED) ===
+        function loadYouTube() {
+            const url = document.getElementById('yt-url-input').value;
+            let videoId = '';
+            
+            // Better Regex for YouTube
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/;
+            const match = url.match(regExp);
+
+            if (match && match[2].length === 11) {
+                videoId = match[2];
+                document.getElementById('yt-placeholder').classList.add('hidden');
+                const iframe = document.getElementById('yt-iframe');
+                iframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1`;
+                iframe.classList.remove('hidden');
+                state.youtube.url = url;
+            } else {
+                alert("Please enter a valid YouTube URL (Videos or Shorts).");
+            }
+        }
+
+        function toggleSplitScreen() {
+            const panel = document.getElementById('yt-tools-panel');
+            if (panel.classList.contains('w-0')) {
+                panel.classList.remove('w-0');
+                panel.classList.add('w-1/2'); 
+            } else {
+                panel.classList.add('w-0');
+                panel.classList.remove('w-1/2');
+            }
+        }
+
+        function switchTool(toolId) {
+            document.querySelectorAll('.tool-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tool-${toolId}`).classList.remove('hidden');
+        }
+
+        // === PDF VIEWER ===
+        document.getElementById('pdf-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if(file && file.type === "application/pdf") {
+                const fileURL = URL.createObjectURL(file);
+                const viewer = document.getElementById('pdf-viewer');
+                viewer.src = fileURL;
+                viewer.classList.remove('hidden');
+                document.getElementById('pdf-msg').classList.add('hidden');
+            }
+        });
+
+        // === CALCULATOR ===
+        function calc(val) {
+            const display = document.getElementById('calc-display');
+            if (val === 'C') display.value = '';
+            else if (val === '=') {
+                try { display.value = eval(display.value); } catch { display.value = 'Error'; }
+            } else {
+                display.value += val;
+            }
+        }
+
+        // === DOUBTS SYSTEM (FIXED) ===
+        function openAddDoubtModal() { document.getElementById('modal-doubt').classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.querySelector('#image-preview img');
+                    img.src = e.target.result;
+                    document.getElementById('image-preview').classList.remove('hidden');
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Image Compression Helper
+        function compressImage(src, quality) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.src = src;
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width / 2; // Resize to 50%
+                    canvas.height = img.height / 2;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = reject;
+            });
+        }
+
+        async function saveDoubt() {
+            const subject = document.getElementById('doubt-subject').value;
+            const text = document.getElementById('doubt-text').value;
+            const priority = document.getElementById('doubt-priority').value;
+            const previewImg = document.querySelector('#image-preview img');
+            
+            let imgSrc = null;
+            if (!document.getElementById('image-preview').classList.contains('hidden') && previewImg.src) {
+                try {
+                    imgSrc = await compressImage(previewImg.src, 0.5); // Compress!
+                } catch (e) {
+                    console.error("Compression failed", e);
+                }
+            }
+            
+            if (text) {
+                const newDoubt = {
+                    id: Date.now(),
+                    subject, text, priority,
+                    image: imgSrc,
+                    status: 'Pending',
+                    date: new Date().toISOString()
+                };
+                
+                try {
+                    state.doubts.unshift(newDoubt);
+                    saveData(); // Try saving
+                    renderDoubts();
+                    closeModal('modal-doubt');
+                    document.getElementById('doubt-subject').value = '';
+                    document.getElementById('doubt-text').value = '';
+                    document.getElementById('image-preview').classList.add('hidden');
+                } catch (e) {
+                    alert("Storage Full! Please delete some old doubts or avoid using images.");
+                    state.doubts.shift();
+                }
+            }
+        }
+
+        function renderDoubts(filter = 'all') {
+            const container = document.getElementById('doubts-grid');
+            if(!container) return;
+            container.innerHTML = '';
+            const list = state.doubts.filter(d => filter === 'all' || d.status === filter);
+            if (list.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center text-slate-500 py-10">No doubts found.</div>';
+                document.getElementById('mini-doubts-list').innerHTML = '<p class="text-xs text-slate-500">No doubts.</p>';
+                return;
+            }
+            list.forEach(d => {
+                const card = document.createElement('div');
+                card.className = 'glass-panel p-4 rounded-xl flex flex-col gap-2 group';
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <span class="text-xs font-bold px-2 py-1 rounded bg-white/10 ${d.priority === 'High' ? 'text-red-400' : 'text-blue-400'}">${d.priority}</span>
+                        <div class="flex gap-2">
+                            <button onclick="toggleDoubtStatus(${d.id})" class="text-xs hover:text-emerald-400 transition" title="Mark Solved"><i class="fa-solid fa-check ${d.status === 'Solved' ? 'text-emerald-400' : 'text-slate-500'}"></i></button>
+                            <button onclick="deleteDoubt(${d.id})" class="text-xs hover:text-red-400 transition"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>
+                    <h4 class="font-bold text-slate-200">${d.subject || 'General'}</h4>
+                    <p class="text-sm text-slate-400 line-clamp-3">${d.text}</p>
+                    ${d.image ? `<img src="${d.image}" class="w-full h-32 object-cover rounded-lg mt-2 border border-white/10 cursor-pointer" onclick="window.open(this.src)">` : ''}
+                    <div class="text-[10px] text-slate-600 mt-2">${new Date(d.date).toLocaleDateString()}</div>
+                `;
+                container.appendChild(card);
+            });
+            const miniContainer = document.getElementById('mini-doubts-list');
+            if(miniContainer) {
+                miniContainer.innerHTML = list.map(d => `
+                    <div class="bg-white/5 p-2 rounded border border-white/5 text-xs">
+                        <div class="font-bold text-emerald-400">${d.subject}</div>
+                        <div class="text-slate-300 truncate">${d.text}</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function toggleDoubtStatus(id) {
+            const d = state.doubts.find(x => x.id === id);
+            if (d) d.status = d.status === 'Solved' ? 'Pending' : 'Solved';
+            renderDoubts();
+            saveData();
+        }
+
+        function deleteDoubt(id) {
+            if(confirm("Delete this doubt?")) {
+                state.doubts = state.doubts.filter(x => x.id !== id);
+                renderDoubts();
+                saveData();
+            }
+        }
+
+        function filterDoubts(status) { renderDoubts(status === 'all' ? 'all' : status); }
+
+        // === STATS & FOREST (FIXED) ===
+        let weeklyChartInstance = null;
+
+        function renderWeeklyChart() {
+            const ctx = document.getElementById('weeklyChart');
+            if(!ctx) return;
+            
+            const labels = [];
+            const dataPoints = [];
+            
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const dateStr = d.toLocaleDateString();
+                labels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+                
+                const dayTotal = state.stats.sessions
+                    .filter(s => new Date(s.date).toLocaleDateString() === dateStr)
+                    .reduce((acc, curr) => acc + curr.duration, 0);
+                
+                dataPoints.push(Math.floor(dayTotal / 60)); 
+            }
+
+            if (weeklyChartInstance) weeklyChartInstance.destroy();
+
+            weeklyChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Focus Minutes',
+                        data: dataPoints,
+                        backgroundColor: 'rgba(16, 185, 129, 0.5)',
+                        borderColor: '#10b981',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function updateStatsUI() {
+            const h = Math.floor(state.stats.totalFocusTime / 3600);
+            const m = Math.floor((state.stats.totalFocusTime % 3600) / 60);
+            document.getElementById('stat-total-time').innerText = `${h}h ${m}m`;
+            document.getElementById('stat-trees').innerText = state.stats.trees;
+            renderForest();
+            renderWeeklyChart();
+        }
+
+        function renderForest() {
+            const container = document.getElementById('forest-container');
+            if (state.forest.length === 0) {
+                container.innerHTML = '<p class="col-span-full text-center text-slate-500 mt-20">Start a session to plant your first tree!</p>';
+                return;
+            }
+            container.innerHTML = state.forest.map(t => `<div class="text-4xl text-center animate-float hover:scale-125 transition cursor-help" title="${new Date(t.date).toLocaleDateString()}">🌲</div>`).join('');
+        }
+
+        // === CALENDAR ===
+        let curMonth = new Date().getMonth();
+        let curYear = new Date().getFullYear();
+
+        function initCalendar() { renderCalendarGrid(curMonth, curYear); }
+
+        function changeMonth(delta) {
+            curMonth += delta;
+            if (curMonth > 11) { curMonth = 0; curYear++; }
+            if (curMonth < 0) { curMonth = 11; curYear--; }
+            renderCalendarGrid(curMonth, curYear);
+        }
+
+        function renderCalendarGrid(month, year) {
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            
+            document.getElementById('calendar-month-year').innerText = `${monthNames[month]} ${year}`;
+            
+            const grid = document.getElementById('calendar-grid');
+            if(!grid) return;
+            grid.innerHTML = '';
+            
+            for (let i = 0; i < firstDay; i++) { grid.innerHTML += `<div></div>`; }
+            
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateStr = new Date(year, month, i).toLocaleDateString();
+                const daySessions = state.stats.sessions.filter(s => new Date(s.date).toLocaleDateString() === dateStr);
+                const dayDoubts = state.doubts.filter(d => new Date(d.date).toLocaleDateString() === dateStr);
+                const hasActivity = daySessions.length > 0 || dayDoubts.length > 0;
+                
+                const el = document.createElement('div');
+                el.className = `aspect-square rounded-lg flex flex-col items-center justify-center cursor-pointer transition ${hasActivity ? 'bg-emerald-500/20 border border-emerald-500/50 hover:bg-emerald-500/40' : 'bg-white/5 hover:bg-white/10'}`;
+                el.onclick = () => showDayDetails(year, month, i);
+                el.innerHTML = `<span class="font-bold ${hasActivity ? 'text-emerald-400' : 'text-slate-400'}">${i}</span>${hasActivity ? `<div class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1"></div>` : ''}`;
+                grid.appendChild(el);
+            }
+        }
+
+        function showDayDetails(year, month, day) {
+            const dateStr = new Date(year, month, day).toLocaleDateString();
+            document.getElementById('cal-date-title').innerText = dateStr;
+            const daySessions = state.stats.sessions.filter(s => new Date(s.date).toLocaleDateString() === dateStr);
+            const dayDoubts = state.doubts.filter(d => new Date(d.date).toLocaleDateString() === dateStr);
+            const container = document.getElementById('cal-content');
+            
+            if (daySessions.length === 0 && dayDoubts.length === 0) {
+                container.innerHTML = '<p class="text-slate-500">No activity recorded for this day.</p>';
+            } else {
+                let html = '';
+                if (daySessions.length > 0) {
+                    const totalMins = Math.floor(daySessions.reduce((a,b) => a + b.duration, 0) / 60);
+                    html += `<div class="bg-white/5 p-3 rounded-lg mb-3"><h4 class="font-bold text-emerald-400 mb-2">Study Sessions</h4><p class="text-sm">Total Focus: ${totalMins} mins</p><p class="text-sm">Trees Grown: ${daySessions.length}</p></div>`;
+                }
+                if (dayDoubts.length > 0) {
+                    html += `<div class="bg-white/5 p-3 rounded-lg"><h4 class="font-bold text-blue-400 mb-2">Doubts Raised</h4><ul class="list-disc list-inside text-sm text-slate-300">${dayDoubts.map(d => `<li>${d.subject}: ${d.text.substring(0, 20)}...</li>`).join('')}</ul></div>`;
+                }
+                container.innerHTML = html;
+            }
+            document.getElementById('modal-cal-details').classList.remove('hidden');
+        }
+
+        // === BROWSER ===
+        function navigateTo(url) {
+            if (!url.startsWith('http')) url = 'https://' + url;
+            alert("Note: Most major sites (Google, Wiki) block iframes securely. If it fails, open in a new tab.");
+            document.getElementById('web-frame').src = url;
+        }
+
+        // === SETTINGS ===
+        function toggleSettings() { document.getElementById('modal-settings').classList.toggle('hidden'); }
+        function setWallpaper(url) {
+            state.wallpaper = url;
+            document.getElementById('bg-layer').style.backgroundImage = `url('${url}')`;
+            saveData();
+        }
+
+        // === SECRET ===
+        function activateMatrixMode() {
+            document.body.classList.add('matrix-mode');
+            alert("SYSTEM HACKED: MATRIX MODE ACTIVATED");
+        }
+
+    </script>
+</body>
+</html>
